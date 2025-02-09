@@ -10,15 +10,16 @@ const isPublicRoute = createRouteMatcher(["/api/webhook/clerk"]);
 export default clerkMiddleware(async (auth, req) => {
   const { userId, redirectToSignIn } = await auth();
 
+  console.log("🔍 Incoming request:", req.nextUrl.pathname);
   console.log("🔍 User ID:", userId);
 
-  const url = new URL(req.url);
-
-  // ✅ Allow Clerk Webhooks to pass through without authentication
+  // ✅ Allow webhook requests to pass through without authentication
   if (isPublicRoute(req)) {
-    console.log("✅ Allowing webhook request:", req.url);
+    console.log("✅ Webhook request allowed:", req.nextUrl.pathname);
     return NextResponse.next();
   }
+
+  const url = new URL(req.url);
 
   // ✅ If user is logged out AND NOT accessing `/sign-in`, redirect to sign-in
   if (!userId && url.pathname !== "/sign-in") {
