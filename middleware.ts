@@ -1,28 +1,25 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// Define protected routes (EXCLUDING `/sign-in`)
-const isProtectedRoute = createRouteMatcher(["/", "/dashboard", "/profile(.*)"]);
-
-// Define public routes (Webhooks should be public)
+// ✅ Define Public Routes (Webhook should be public)
 const isPublicRoute = createRouteMatcher(["/api/webhook/clerk"]);
 
+// ✅ Define Protected Routes (Require Authentication)
+const isProtectedRoute = createRouteMatcher(["/", "/dashboard", "/profile(.*)"]);
+
 export default clerkMiddleware(async (auth, req) => {
+  console.log("🔍 Incoming request:", req.method, req.nextUrl.pathname);
+
   const { userId, redirectToSignIn } = await auth();
 
-  console.log("🔍 Incoming request:", req);
-  console.log("🔍 User ID:", userId);
-
-  // ✅ Allow webhook requests to pass through without authentication
+  // ✅ Allow Webhook Requests Without Authentication
   if (isPublicRoute(req)) {
     console.log("✅ Webhook request allowed:", req.nextUrl.pathname);
     return NextResponse.next();
   }
 
-  const url = new URL(req.url);
-
-  // ✅ If user is logged out AND NOT accessing `/sign-in`, redirect to sign-in
-  if (!userId && url.pathname !== "/sign-in") {
+  // ✅ If user is NOT logged in AND NOT accessing `/sign-in`, redirect to sign-in
+  if (!userId && req.nextUrl.pathname !== "/sign-in") {
     return redirectToSignIn({ returnBackUrl: req.url });
   }
 
@@ -34,6 +31,12 @@ export default clerkMiddleware(async (auth, req) => {
   return NextResponse.next();
 });
 
+// ✅ Ensure the Webhook Route is Allowed in Middleware Matching
 export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: [
+    "/api/webhook/clerk", // ✅ Ensure webhook is publicly accessible
+    "/((?!.*\\..*|_next).*)",
+    "/",
+    "/(api|trpc)(.*)",
+  ],
 };
