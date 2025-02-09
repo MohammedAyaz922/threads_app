@@ -1,10 +1,8 @@
-
 import { Webhook, WebhookRequiredHeaders } from "svix";
 import { headers } from "next/headers";
-
 import { IncomingHttpHeaders } from "http";
-
 import { NextResponse } from "next/server";
+
 import {
   addMemberToCommunity,
   createCommunity,
@@ -13,7 +11,7 @@ import {
   updateCommunityInfo,
 } from "@/lib/actions/community.actions";
 
-// Above document lists the supported events
+// Define supported Clerk webhook events
 type EventType =
   | "organization.created"
   | "organizationInvitation.created"
@@ -29,168 +27,123 @@ type Event = {
 };
 
 export const POST = async (request: Request) => {
-  const payload = await request.json();
-  const header = await headers();
-
-  const heads = {
-    "svix-id": header.get("svix-id"),
-    "svix-timestamp": header.get("svix-timestamp"),
-    "svix-signature": header.get("svix-signature"),
-  };
-
-  // Activitate Webhook in the Clerk Dashboard.
-  // After adding the endpoint, you'll see the secret on the right side.
-  const wh = new Webhook(process.env.NEXT_CLERK_WEBHOOK_SECRET || "");
-
-  let evnt: Event | null = null;
-
   try {
-    evnt = wh.verify(
-      JSON.stringify(payload),
-      heads as IncomingHttpHeaders & WebhookRequiredHeaders
-    ) as Event;
-  } catch (err) {
-    return NextResponse.json({ message: err }, { status: 400 });
-  }
+    // Await the headers() function to get the headers list
+    const headersList = await headers();
 
-  const eventType: EventType = evnt?.type!;
+    console.log("🔍 Webhook Secret from ENV:", process.env.NEXT_CLERK_WEBHOOK_SECRET);
 
-  // Listen organization creation event
-  if (eventType === "organization.created") {
-    // Show what evnt?.data sends from above resource
-    const { id, name, slug, logo_url, image_url, created_by } =
-      evnt?.data ?? {};
+    // Extract Svix headers safely
+    const heads = {
+      "svix-id": headersList.get("svix-id") || "",
+      "svix-timestamp": headersList.get("svix-timestamp") || "",
+      "svix-signature": headersList.get("svix-signature") || "",
+    };
+
+    console.log("🔍 Extracted Headers:", heads);
+
+    // Validate headers exist before processing
+    if (!heads["svix-id"] || !heads["svix-signature"] || !heads["svix-timestamp"]) {
+      console.error("❌ Missing required Svix headers:", heads);
+      return NextResponse.json({ message: "Missing required Svix headers" }, { status: 400 });
+    }
+
+    // Ensure Webhook Secret is available
+    const webhookSecret = process.env.NEXT_CLERK_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("❌ Webhook secret is missing in environment variables!");
+      return NextResponse.json({ message: "Server misconfiguration" }, { status: 500 });
+    }
+
+    const payload = await request.json();
+    console.log("🔍 Received Webhook Payload:", JSON.stringify(payload, null, 2));
+
+    // Verify webhook signature using Svix
+    const wh = new Webhook(webhookSecret);
+    let event: Event | null = null;
 
     try {
-      // @ts-ignore
-      await createCommunity(
-        // @ts-ignore
-        id,
-        name,
-        slug,
-        logo_url || image_url,
-        "org bio",
-        created_by
-      );
-
-      return NextResponse.json({ message: "User created" }, { status: 201 });
+      event = wh.verify(
+        JSON.stringify(payload),
+        heads as IncomingHttpHeaders & WebhookRequiredHeaders
+      ) as Event;
     } catch (err) {
-      console.log(err);
-      return NextResponse.json(
-        { message: "Internal Server Error" },
-        { status: 500 }
-      );
+      console.error("❌ Webhook verification failed:", err);
+      return NextResponse.json({ message: "Invalid webhook signature" }, { status: 400 });
     }
-  }
 
-  // Listen organization invitation creation event.
-  // Just to show. You can avoid this or tell people that we can create a new mongoose action and
-  // add pending invites in the database.
-  if (eventType === "organizationInvitation.created") {
-    try {
-      console.log("Invitation created", evnt?.data);
+    console.log("✅ Webhook Verified:", event);
 
-      return NextResponse.json(
-        { message: "Invitation created" },
-        { status: 201 }
-      );
-    } catch (err) {
-      console.log(err);
+    const eventType: EventType = event?.type!;
 
-      return NextResponse.json(
-        { message: "Internal Server Error" },
-        { status: 500 }
-      );
+    // Handle different event types
+    switch (eventType) {
+      case "organization.created":
+        const { id, name, slug, logo_url, image_url, created_by } = event?.data ?? {};
+        console.log("🔍 Logging event type:", eventType);
+        try {
+          // @ts-ignore
+          await createCommunity(id, name, slug, logo_url || image_url, "org bio", created_by);
+          return NextResponse.json({ message: "Organization created" }, { status: 201 });
+        } catch (err) {
+          console.error("❌ Error creating community:", err);
+          return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        }
+
+      case "organizationMembership.created":
+        const { organization, public_user_data } = event?.data;
+        try {
+          console.log("🔍 Membership Created Event Data:", event?.data);
+          // @ts-ignore
+          await addMemberToCommunity(organization.id, public_user_data.user_id);
+          return NextResponse.json({ message: "Member added" }, { status: 201 });
+        } catch (err) {
+          console.error("❌ Error adding member:", err);
+          return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        }
+
+      case "organizationMembership.deleted":
+        const { organization: org, public_user_data: user } = event?.data;
+        try {
+          console.log("🔍 Membership Deleted Event Data:", event?.data);
+          // @ts-ignore
+          await removeUserFromCommunity(user.user_id, org.id);
+          return NextResponse.json({ message: "Member removed" }, { status: 201 });
+        } catch (err) {
+          console.error("❌ Error removing member:", err);
+          return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        }
+
+      case "organization.updated":
+        const { id: orgId, name: orgName, slug: orgSlug, logo_url: orgLogo } = event?.data;
+        try {
+          console.log("🔍 Organization Updated Event Data:", event?.data);
+          // @ts-ignore
+          await updateCommunityInfo(orgId, orgName, orgSlug, orgLogo);
+          return NextResponse.json({ message: "Organization updated" }, { status: 201 });
+        } catch (err) {
+          console.error("❌ Error updating organization:", err);
+          return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        }
+
+      case "organization.deleted":
+        const { id: deletedOrgId } = event?.data;
+        try {
+          console.log("🔍 Organization Deleted Event Data:", event?.data);
+          // @ts-ignore
+          await deleteCommunity(deletedOrgId);
+          return NextResponse.json({ message: "Organization deleted" }, { status: 201 });
+        } catch (err) {
+          console.error("❌ Error deleting organization:", err);
+          return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        }
+
+      default:
+        console.warn("⚠️ Unhandled Event Type:", eventType);
+        return NextResponse.json({ message: "Event type not handled" }, { status: 400 });
     }
-  }
-
-  // Listen organization membership (member invite & accepted) creation
-  if (eventType === "organizationMembership.created") {
-    try {
-      // Show what evnt?.data sends from above resource
-      const { organization, public_user_data } = evnt?.data;
-      console.log("created", evnt?.data);
-
-      // @ts-ignore
-      await addMemberToCommunity(organization.id, public_user_data.user_id);
-
-      return NextResponse.json(
-        { message: "Invitation accepted" },
-        { status: 201 }
-      );
-    } catch (err) {
-      console.log(err);
-
-      return NextResponse.json(
-        { message: "Internal Server Error" },
-        { status: 500 }
-      );
-    }
-  }
-
-  // Listen member deletion event
-  if (eventType === "organizationMembership.deleted") {
-    try {
-      // Show what evnt?.data sends from above resource
-      const { organization, public_user_data } = evnt?.data;
-      console.log("removed", evnt?.data);
-
-      // @ts-ignore
-      await removeUserFromCommunity(public_user_data.user_id, organization.id);
-
-      return NextResponse.json({ message: "Member removed" }, { status: 201 });
-    } catch (err) {
-      console.log(err);
-
-      return NextResponse.json(
-        { message: "Internal Server Error" },
-        { status: 500 }
-      );
-    }
-  }
-
-  // Listen organization updation event
-  if (eventType === "organization.updated") {
-    try {
-      // Show what evnt?.data sends from above resource
-      const { id, logo_url, name, slug } = evnt?.data;
-      console.log("updated", evnt?.data);
-
-      // @ts-ignore
-      await updateCommunityInfo(id, name, slug, logo_url);
-
-      return NextResponse.json({ message: "Member removed" }, { status: 201 });
-    } catch (err) {
-      console.log(err);
-
-      return NextResponse.json(
-        { message: "Internal Server Error" },
-        { status: 500 }
-      );
-    }
-  }
-
-  // Listen organization deletion event
-  if (eventType === "organization.deleted") {
-    try {
-      // Show what evnt?.data sends from above resource
-      const { id } = evnt?.data;
-      console.log("deleted", evnt?.data);
-
-      // @ts-ignore
-      await deleteCommunity(id);
-
-      return NextResponse.json(
-        { message: "Organization deleted" },
-        { status: 201 }
-      );
-    } catch (err) {
-      console.log(err);
-
-      return NextResponse.json(
-        { message: "Internal Server Error" },
-        { status: 500 }
-      );
-    }
+  } catch (error) {
+    console.error("❌ Unexpected Webhook Error:", error);
+    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
   }
 };

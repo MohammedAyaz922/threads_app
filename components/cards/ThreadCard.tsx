@@ -40,8 +40,8 @@ function ThreadCard({
     isComment,
 }: Props) {
 
-    console.log(`Author ${author.id}`)
-    console.log(`Current User ${currentUserId}`)
+
+    console.log("Logging Community", community)
 
     return (
         <article
