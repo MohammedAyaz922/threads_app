@@ -1,34 +1,45 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+<h1 align="center"> Threads App</h1>
+<div align="center">
+  
+  <a href="https://threads-eh6ux7d22-mohammed-ayaz-khans-projects.vercel.app/" target="_blank">↪️ Demo</a>
+  <br />
+  <br />
+  
+</div> 
 
-## Getting Started
+<div align="center">
+</div>
 
-First, run the development server:
+<h2> ✨ About The Project</h2>
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+Threads App is a modern, responsive web application crafted using cutting-edge technologies. Developed with Next.js, TypeScript, Tailwind CSS, Clerk, Webhook, Zod, UploadThing, and MongoDB, this application stands out with its user-friendly interface and functionality.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+----
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ⚡ Used Techologies
+- **Next.js and TypeScript** 
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+- **Clerk**
 
-## Learn More
+- **Tailwind CSS** 
 
-To learn more about Next.js, take a look at the following resources:
+- **Webhook and UploadThing** 
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Zod**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+- **MongoDB** 
 
-## Deploy on Vercel
+----
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🚀 Getting Started
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+1. **Clone the project:** `git clone https://github.com/MohammedAyaz922/threads_app.git`
+2. **Install dependencies:** `npm install`
+3. **Set up environment variables:** Copy the `.env.example` file, rename it to `.env`, and add the required values.
+4. **Start the application:** `npm run dev`
+
+----
+  
+  <h2> 📧 Contact </h2>
+
+Mohammed Ayaz khan- [Linkedin](www.linkedin.com/in/mohammed-ayaz-khan-120536220) - [E-mail](mohammedayazk017@gmail.com)
