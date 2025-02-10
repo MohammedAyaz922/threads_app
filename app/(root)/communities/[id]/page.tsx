@@ -10,16 +10,37 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { fetchCommunityDetails } from "@/lib/actions/community.actions";
 
-async function Page({ params }: { params: { id: string } }) {
-    const user = await currentUser();
-    if (!user) return null;
+async function Page({ params }: { params: Promise<{ id: string }> }) {  // ✅ Await params if it's a Promise
+    const resolvedParams = await params; // ✅ Ensure params is awaited
 
-    const communityDetails = await fetchCommunityDetails(params.id);
+    console.log("🔍 Received Params:", resolvedParams); 
+
+    if (!resolvedParams?.id) {
+        console.error("❌ Missing ID in params.");
+        return null;
+    }
+
+    const user = await currentUser();
+    if (!user) {
+        console.error("❌ User not authenticated.");
+        return null;
+    }
+
+    console.log("✅ Authenticated User:", user.id);
+
+    const communityDetails = await fetchCommunityDetails(resolvedParams.id); // ✅ Use resolvedParams.id
+    
+    if (!communityDetails) {
+        console.error(`❌ Community details not found for ID: ${resolvedParams.id}`);
+        return null;
+    }
+
+    console.log("✅ Community Details Fetched:", communityDetails);
 
     return (
         <section>
             <ProfileHeader
-                accountId={communityDetails.createdBy.id}
+                accountId={communityDetails.createdBy?.id || ""}
                 authUserId={user.id}
                 name={communityDetails.name}
                 username={communityDetails.username}
@@ -42,7 +63,7 @@ async function Page({ params }: { params: { id: string } }) {
                                 />
                                 <p className='max-sm:hidden'>{tab.label}</p>
 
-                                {tab.label === "Threads" && (
+                                {tab.label === "Threads" && communityDetails.threads && (
                                     <p className='ml-1 rounded-sm bg-light-4 px-2 py-1 !text-tiny-medium text-light-2'>
                                         {communityDetails.threads.length}
                                     </p>
@@ -52,36 +73,46 @@ async function Page({ params }: { params: { id: string } }) {
                     </TabsList>
 
                     <TabsContent value='threads' className='w-full text-light-1'>
-                        {/* @ts-ignore */}
-                        <ThreadsTab
-                            currentUserId={user.id}
-                            accountId={communityDetails._id}
-                            accountType='Community'
-                        />
+                        {communityDetails.threads?.length > 0 ? (
+                            <ThreadsTab
+                                currentUserId={user.id}
+                                accountId={communityDetails._id}
+                                accountType='Community'
+                            />
+                        ) : (
+                            <p className="text-light-2">No threads available.</p>
+                        )}
                     </TabsContent>
 
                     <TabsContent value='members' className='mt-9 w-full text-light-1'>
                         <section className='mt-9 flex flex-col gap-10'>
-                            {communityDetails.members.map((member: any) => (
-                                <UserCard
-                                    key={member.id}
-                                    id={member.id}
-                                    name={member.name}
-                                    username={member.username}
-                                    imgUrl={member.image}
-                                    personType='User'
-                                />
-                            ))}
+                            {communityDetails.members?.length > 0 ? (
+                                communityDetails.members.map((member: any) => (
+                                    <UserCard
+                                        key={member.id}
+                                        id={member.id}
+                                        name={member.name}
+                                        username={member.username}
+                                        imgUrl={member.image}
+                                        personType='User'
+                                    />
+                                ))
+                            ) : (
+                                <p className="text-light-2">No members found.</p>
+                            )}
                         </section>
                     </TabsContent>
 
                     <TabsContent value='requests' className='w-full text-light-1'>
-                        {/* @ts-ignore */}
-                        <ThreadsTab
-                            currentUserId={user.id}
-                            accountId={communityDetails._id}
-                            accountType='Community'
-                        />
+                        {communityDetails.requests?.length > 0 ? (
+                            <ThreadsTab
+                                currentUserId={user.id}
+                                accountId={communityDetails._id}
+                                accountType='Community'
+                            />
+                        ) : (
+                            <p className="text-light-2">No pending requests.</p>
+                        )}
                     </TabsContent>
                 </Tabs>
             </div>
